@@ -1,6 +1,8 @@
 const express = require("express");
 const path = require("path");
 const hbs = require("hbs");
+const forecast = require("./utils/forecast");
+const geocode = require("./utils/geocode");
 
 const app = express();
 
@@ -32,13 +34,39 @@ app.get("/help", (req, res) => {
 });
 app.get("/about", (req, res) => {
     res.render("about", {
-        title: "About page",
+        title: "About ",
         name: "hyunseok",
     });
 });
 
 app.get("/weather", (req, res) => {
-    res.send("This is weather page!");
+    if (!req.query.address) {
+        return res.send({
+            error: "You must provide an address",
+        });
+    }
+    geocode(
+        req.query.address,
+        (error, { latitude, longitude, location } = {}) => {
+            if (error) {
+                return res.send({
+                    error,
+                });
+            }
+            forecast(latitude, longitude, (error, forecastData) => {
+                if (error) {
+                    return res.send({
+                        error,
+                    });
+                }
+                res.send({
+                    location,
+                    forecast: forecastData,
+                    address: req.query.address,
+                });
+            });
+        }
+    );
 });
 
 app.get("/help/*", (req, res) => {
