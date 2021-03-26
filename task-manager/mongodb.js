@@ -27,17 +27,26 @@ MongoClient.connect(
         //         console.log(e);
         //     });
         db.collection("tasks")
-            .updateMany(
-                { completed: false },
-                {
-                    $set: {
-                        completed: true,
-                    },
-                }
-            )
+            .find({ description: "second task" })
+            .toArray()
             .then((res) => {
-                console.log(res.modifiedCount);
+                console.log(res);
             })
-            .catch((e) => console.log(e));
+            .catch((e) => {
+                console.log(e);
+            });
+        // db.collection("tasks")
+        //     .updateMany(
+        //         { completed: false },
+        //         {
+        //             $set: {
+        //                 completed: true,
+        //             },
+        //         }
+        //     )
+        //     .then((res) => {
+        //         console.log(res.modifiedCount);
+        //     })
+        //     .catch((e) => console.log(e));
     }
 );
