@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 const validator = require("validator");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const Task = require("./task");
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -12,6 +15,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         trim: true,
         lowercase: true,
+        unique: true,
         validate(value) {
             if (!validator.isEmail(value)) {
                 throw new Error("Email is invalid");
@@ -38,14 +42,73 @@ const userSchema = new mongoose.Schema({
             }
         },
     },
+    tokens: [
+        {
+            token: {
+                type: String,
+                required: true,
+            },
+        },
+    ],
 });
 
-// userSchema.pre("save", async function (next) {
-//     const user = this;
-//     console.log("jst before saving");
+userSchema.virtual("tasks", {
+    ref: "task",
+    localField: "_id",
+    foreignField: "owner",
+});
 
-//     next();
-// });
+// statics for User model. We can use arrow function here
+userSchema.statics.findByCredentials = async (email, password) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new Error("Unable to login");
+    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+        throw new Error("Unable to login");
+    }
+    return user;
+};
+
+// methods for instance, or the individual user. We cannot use arrow function here because we have to bind 'this' keyword
+userSchema.methods.generateAuthToken = async function () {
+    const user = this;
+    const token = jwt.sign({ _id: user.id.toString() }, "thisisasecret");
+    user.tokens = user.tokens.concat({ token });
+    await user.save();
+    return token;
+};
+
+userSchema.methods.toJSON = function () {
+    const user = this;
+    const userObject = user.toObject();
+    // toObject method is a method provided by Mongoose to clean up the object so it removes all of the metadata and methods (like .save() or .toObject()) that Mongoose attaches to it. It just becomes a regular object afterward.
+
+    delete userObject.password;
+    delete userObject.tokens;
+
+    return userObject;
+};
+
+userSchema.pre("save", async function (next) {
+    const user = this;
+    if (user.isModified("password")) {
+        user.password = await bcrypt.hash(user.password, 8);
+    }
+    if (user.isModified("name")) {
+        console.log("name has been changed");
+    }
+
+    next();
+});
+
+// Delete user tasks when user is deleted
+userSchema.pre("remove", async function (next) {
+    const user = this;
+    await Task.deleteMany({ owner: user._id });
+    next();
+});
 
 const User = mongoose.model("User", userSchema);
 
